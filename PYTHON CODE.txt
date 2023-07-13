@@ -1,0 +1,63 @@
+# This is an auto-generated code <67be2dcc5b46e83eacf21b8c4d8003c2>
+# uses generator version 1.1.0
+# please use dataset nse
+
+
+
+from blueshift.api import schedule_function, set_long_only, time_rules
+from blueshift.api import order_percent, date_rules, symbol
+from blueshift.library.library import get_portfolio_assets, finish_prune_tracking, handle_stop_loss
+from blueshift.library.library import alpha_function, init_prune_tracking, get_history
+from blueshift.library.library import enter_long, squareoff
+
+
+def initialize(context):
+    set_long_only()
+    context.universe = [symbol('HDFCBANK')]
+    context.death_cross = {}
+    context.golden_cross = {}
+    context.long_term_ma = {}
+    context.short_term_ma = {}
+    schedule_function(scheduled_func_37435, date_rules.every_day(),
+        time_rules.market_open(hours=0, minutes=5))
+
+
+def stop_loss_func(context, data):
+    assets = get_portfolio_assets(context)
+    if not assets:
+        return
+    handle_stop_loss(context, data, None, 'PERCENT', 11)
+
+
+def handle_data(context, data):
+    stop_loss_func(context, data)
+
+
+def rule_func_37447(context, data):
+    for asset in context.universe:
+        if context.death_cross[asset]:
+            squareoff(context)
+
+
+def rule_func_37439(context, data):
+    for asset in context.universe:
+        if context.golden_cross[asset]:
+            enter_long(context, asset, order_percent, 0.5, None, 'SCHEDULE')
+
+
+def scheduled_func_37435(context, data):
+    init_prune_tracking(context, 'SCHEDULE')
+    context.history_1m = get_history(data, context.universe, ['close'], 245,
+        '1m')
+    for asset in context.universe:
+        context.short_term_ma[asset] = alpha_function(context.history_1m,
+            asset, func='simple_moving_average', kwargs={'lookback': 50})
+        context.long_term_ma[asset] = alpha_function(context.history_1m,
+            asset, func='simple_moving_average', kwargs={'lookback': 200})
+        context.death_cross[asset] = context.short_term_ma[asset
+            ] < context.long_term_ma[asset]
+        context.golden_cross[asset] = context.short_term_ma[asset
+            ] > context.long_term_ma[asset]
+    rule_func_37439(context, data)
+    rule_func_37447(context, data)
+    finish_prune_tracking(context, 'SCHEDULE')
